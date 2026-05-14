@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "description": "Desktop pet + universal agent CLI shell — drag a transparent pet onto your screen, chat with Claude / Codex / opencode through a single interface.",
   "main": "out/main/index.js",
-  "author": "wsxwj123",
+  "author": {
+    "name": "wsxwj123",
+    "email": "wsxwj123@users.noreply.github.com"
+  },
   "license": "MIT",
   "homepage": "https://github.com/wsxwj123/claude-pet",
   "repository": {
