@@ -1,0 +1,45 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/
+.pnp.*
+.yarn/cache
+.yarn/install-state.gz
+
+# Build outputs
+out/
+dist/
+dist-electron/
+release/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env / secrets
+.env
+.env.local
+.env.*.local
+
+# Editor
+.idea/
+.vscode/
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# Electron-builder packaging artifacts
+electron-builder.env
+*.dmg
+*.AppImage
+*.exe
+*.deb
+*.snap
+*.rpm

@@ -1,0 +1,26 @@
+{
+  "id": "aider",
+  "displayName": "Aider",
+  "binary": "aider",
+  "args": [
+    "--message",
+    "{prompt}",
+    "--no-pretty",
+    "--stream",
+    "--no-show-model-warnings",
+    "--yes-always"
+  ],
+  "stdinPrompt": false,
+  "configDir": "~/.aider.conf.d",
+  "skillsDir": "~/.aider.conf.d/skills",
+  "env": {},
+  "models": [
+    "openai/gpt-5.5",
+    "anthropic/claude-opus-4-6",
+    "deepseek/deepseek-chat"
+  ],
+  "defaultModel": "openai/gpt-5.5",
+  "events": {
+    "kind": "text-stream"
+  }
+}

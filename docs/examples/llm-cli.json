@@ -1,0 +1,14 @@
+{
+  "id": "llm",
+  "displayName": "llm (simonw)",
+  "binary": "llm",
+  "args": ["--no-stream", "{prompt}"],
+  "stdinPrompt": false,
+  "configDir": "~/Library/Application Support/io.datasette.llm",
+  "env": {},
+  "models": ["gpt-5.5", "claude-opus-4-6", "gemini-3-pro"],
+  "defaultModel": "gpt-5.5",
+  "events": {
+    "kind": "text-stream"
+  }
+}
