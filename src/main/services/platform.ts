@@ -124,3 +124,15 @@ export function resolveBinary(nameOrPath: string): string | null {
 export function hasBinary(name: string): boolean {
   return resolveBinary(name) !== null
 }
+
+/**
+ * Build spawn options that work cross-platform for a given binary
+ * name. Resolves to absolute path (Windows spawn won't auto-resolve
+ * .exe/.cmd extensions), and enables `shell: true` for .cmd/.bat
+ * shims (npm-global on Windows installs CLIs as .cmd wrappers).
+ */
+export function resolveSpawn(bin: string): { command: string; shell: boolean } {
+  const abs = resolveBinary(bin) ?? bin
+  const shell = /\.(cmd|bat|ps1)$/i.test(abs)
+  return { command: abs, shell }
+}

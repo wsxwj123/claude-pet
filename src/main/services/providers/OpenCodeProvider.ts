@@ -4,7 +4,7 @@ import os from 'os'
 import path from 'path'
 import { Provider, ProviderInfo, ChatContent, ChatTurnCallbacks, SendOptions } from './Provider'
 import { AgentStateManager } from '../AgentStateManager'
-import { hasBinary, spawnPath } from '../platform'
+import { hasBinary, spawnPath, resolveBinary } from '../platform'
 
 /**
  * opencode provider — `opencode run "<prompt>" --format json [-c|--session id] [-m provider/model]`
@@ -123,12 +123,18 @@ export class OpenCodeProvider implements Provider {
       // issue #26901. We still pass --model so pet picks up any future
       // fix automatically; today the model is effectively dictated by
       // whatever the user's plugins / on-disk opencode.json define.
-      const proc: ChildProcess = spawn(this.opencodeBin, args, {
+      // Windows: child_process.spawn() doesn't auto-resolve `opencode`
+      // → `opencode.exe`/`opencode.cmd`, so spawn fails with ENOENT
+      // even when the binary is on PATH. Always pass the absolute path.
+      // For .cmd/.bat shims (npm-global on Windows), shell:true is also
+      // required since Node won't direct-exec them.
+      const absBin = resolveBinary(this.opencodeBin) ?? this.opencodeBin
+      const needsShell = /\.(cmd|bat|ps1)$/i.test(absBin)
+      const proc: ChildProcess = spawn(absBin, args, {
         cwd: options.cwd ?? os.homedir(),
         env: { ...process.env, PATH: spawnPath() },
-        // No stdin needed — prompt is passed as positional arg. Closing
-        // stdin upfront prevents opencode from ever blocking on it.
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: needsShell
       })
 
       let stdoutBuf = ''

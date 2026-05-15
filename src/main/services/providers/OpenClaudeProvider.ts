@@ -4,7 +4,7 @@ import os from 'os'
 import path from 'path'
 import { Provider, ProviderInfo, ChatContent, ChatTurnCallbacks, SendOptions } from './Provider'
 import { AgentStateManager } from '../AgentStateManager'
-import { hasBinary, spawnPath } from '../platform'
+import { hasBinary, spawnPath, resolveSpawn } from '../platform'
 
 // openclaude is a Claude Code fork at https://github.com/Gitlawb/openclaude
 // installed via `npm install -g @gitlawb/openclaude`. It mirrors claude's
@@ -81,9 +81,11 @@ export class OpenClaudeProvider implements Provider {
           .map((a) => (a.length > 60 ? a.slice(0, 60) + '…' : a))
           .join(' ')}`
       )
-      const proc: ChildProcess = spawn(this.openclaudeBin, args, {
+      const { command, shell } = resolveSpawn(this.openclaudeBin)
+      const proc: ChildProcess = spawn(command, args, {
         cwd: options.cwd ?? os.homedir(),
-        env: { ...process.env, PATH: spawnPath() }
+        env: { ...process.env, PATH: spawnPath() },
+        shell
       })
 
       let stdoutBuf = ''

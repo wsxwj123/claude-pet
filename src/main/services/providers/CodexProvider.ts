@@ -4,7 +4,7 @@ import os from 'os'
 import path from 'path'
 import { Provider, ProviderInfo, ChatContent, ChatTurnCallbacks, SendOptions } from './Provider'
 import { AgentStateManager } from '../AgentStateManager'
-import { hasBinary, spawnPath } from '../platform'
+import { hasBinary, spawnPath, resolveSpawn } from '../platform'
 
 /**
  * OpenAI Codex CLI provider — github.com/openai/codex (Rust, 82k★).
@@ -132,10 +132,12 @@ export class CodexProvider implements Provider {
           .map((a) => (a.length > 60 ? a.slice(0, 60) + '…' : a))
           .join(' ')}`
       )
-      const proc: ChildProcess = spawn(this.codexBin, args, {
+      const { command, shell } = resolveSpawn(this.codexBin)
+      const proc: ChildProcess = spawn(command, args, {
         cwd: options.cwd ?? os.homedir(),
         env: { ...process.env, PATH: spawnPath() },
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell
       })
       this.agentState?.handleHook('codex', 'user')
 

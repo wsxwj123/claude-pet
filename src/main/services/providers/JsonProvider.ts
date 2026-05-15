@@ -3,7 +3,7 @@ import os from 'os'
 import path from 'path'
 import { Provider, ProviderInfo, ChatContent, ChatTurnCallbacks, SendOptions } from './Provider'
 import { AgentStateManager } from '../AgentStateManager'
-import { hasBinary, spawnPath } from '../platform'
+import { hasBinary, spawnPath, resolveSpawn } from '../platform'
 
 /**
  * JSON-defined custom provider. Schema lives at
@@ -110,13 +110,15 @@ export class JsonProvider implements Provider {
           .replace(/{sessionId}/g, options.sessionId ?? '')
       )
 
-      const proc: ChildProcess = spawn(this.spec.binary, args, {
+      const { command, shell } = resolveSpawn(this.spec.binary)
+      const proc: ChildProcess = spawn(command, args, {
         cwd: options.cwd ?? os.homedir(),
         env: {
           ...process.env,
           PATH: spawnPath(),
           ...(this.spec.env ?? {})
-        }
+        },
+        shell
       })
       // Flash 'jumping' → POST_JUMPING_STATE so the pet sprite + label
       // reflect that this custom provider has started. Without this the

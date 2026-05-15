@@ -2,7 +2,7 @@ import { spawn, ChildProcess } from 'child_process'
 import os from 'os'
 import path from 'path'
 import { Provider, ProviderInfo, ChatContent, ChatTurnCallbacks, SendOptions } from './Provider'
-import { hasBinary, spawnPath } from '../platform'
+import { hasBinary, spawnPath, resolveSpawn } from '../platform'
 
 /**
  * Claude Code CLI provider.
@@ -61,12 +61,14 @@ export class ClaudeCliProvider implements Provider {
         args.push('--model', options.model)
       }
 
-      const proc: ChildProcess = spawn(this.claudeBin, args, {
+      const { command, shell } = resolveSpawn(this.claudeBin)
+      const proc: ChildProcess = spawn(command, args, {
         cwd: options.cwd ?? os.homedir(),
         env: {
           ...process.env,
           PATH: spawnPath()
-        }
+        },
+        shell
       })
 
       let stdoutBuf = ''

@@ -15,7 +15,7 @@ const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json')
 const LEGACY_CONFIG_PATH = path.join(os.homedir(), '.claude', 'claude-pets-config.json')
 
 const DEFAULT_CONFIG: PetConfig = {
-  activePet: 'clawd',
+  activePet: 'clawd-default',
   petScale: 0.4,
   position: { x: 50, y: 300 },
   preferredProviderId: 'claude-cli',
