@@ -1,0 +1,176 @@
+name: Build & Release
+
+# Triggers:
+#   - Push a tag like `v0.2.0` → cross-platform build → attach to GitHub Release
+#   - Manual dispatch from Actions tab (without tagging)
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name to release as (e.g. v0.2.0). Tag must already exist.'
+        required: true
+
+permissions:
+  contents: write     # need write to upload assets onto the release
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────
+  # Cross-platform build matrix. Each runner produces the installers
+  # native to its OS/arch and uploads them as workflow artifacts.
+  # ──────────────────────────────────────────────────────────────────
+  build:
+    name: build (${{ matrix.os }} ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos
+            arch: arm64
+            runner: macos-14            # Apple Silicon runner
+            build_args: --mac dmg zip --arm64
+            artifact_glob: 'release/*.dmg release/*-mac.zip'
+          - os: macos
+            arch: x64
+            runner: macos-13            # Intel runner
+            build_args: --mac dmg zip --x64
+            artifact_glob: 'release/*.dmg release/*-mac.zip'
+          - os: windows
+            arch: x64
+            runner: windows-latest
+            build_args: --win nsis --x64
+            artifact_glob: 'release/*.exe'
+          - os: linux
+            arch: x64
+            runner: ubuntu-latest
+            build_args: --linux AppImage deb --x64
+            artifact_glob: 'release/*.AppImage release/*.deb'
+          - os: linux
+            arch: arm64
+            runner: ubuntu-latest
+            build_args: --linux AppImage deb --arm64
+            artifact_glob: 'release/*.AppImage release/*.deb'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build renderer + main
+        run: npx electron-vite build
+
+      - name: Package (electron-builder)
+        env:
+          # macOS signing (no-op when these secrets aren't set in the repo).
+          # To enable: add Apple Developer ID Application .p12 (base64),
+          # password, and Apple ID + app-specific password as repo secrets.
+          CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Disable code-signing entirely when no cert is set — avoids
+          # electron-builder trying to sign with garbage credentials.
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.MAC_CERT_P12_BASE64 != '' }}
+          # electron-builder reads this to upload via GitHub Releases API
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder ${{ matrix.build_args }} --publish never
+
+      - name: Rename Windows installer (remove spaces in filename)
+        if: matrix.os == 'windows'
+        shell: bash
+        run: |
+          set -e
+          shopt -s nullglob
+          for f in release/*' '*.exe; do
+            new="${f// /-}"
+            mv "$f" "$new"
+            echo "renamed: $f -> $new"
+          done
+          for f in release/*' '*.exe.blockmap; do
+            new="${f// /-}"
+            mv "$f" "$new"
+          done
+
+      - name: List artifacts
+        shell: bash
+        run: ls -lh release/
+
+      - name: Upload artifacts to workflow
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-${{ matrix.arch }}
+          path: |
+            release/*.dmg
+            release/*-mac.zip
+            release/*.exe
+            release/*.AppImage
+            release/*.deb
+          if-no-files-found: error
+          retention-days: 14
+
+  # ──────────────────────────────────────────────────────────────────
+  # Aggregate all platform artifacts, attach to the GitHub Release
+  # corresponding to the pushed tag.
+  # ──────────────────────────────────────────────────────────────────
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-artifacts
+
+      - name: Flatten artifacts
+        shell: bash
+        run: |
+          mkdir -p assets
+          find dist-artifacts -type f \
+            \( -name '*.dmg' -o -name '*-mac.zip' \
+               -o -name '*.exe' -o -name '*.AppImage' \
+               -o -name '*.deb' \) \
+            -exec cp {} assets/ \;
+          ls -lh assets/
+
+      - name: Resolve tag
+        id: tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: ${{ steps.tag.outputs.name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            assets/*.dmg
+            assets/*-mac.zip
+            assets/*.exe
+            assets/*.AppImage
+            assets/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
