@@ -101,6 +101,15 @@ export class OpenCodeProvider implements Provider {
       // `--model` flag — making pet's model picker useless. Pet keeps
       // its own ChatStore + streaming, so it doesn't need plugin-side
       // memory/skill injection.
+      // `--file` in opencode is declared as a variadic array flag —
+      // without an explicit `--` separator yargs swallows everything
+      // after the last --file (including our positional `prompt`) into
+      // the file list. Result: opencode reports `File not found: 看看
+      // 这个是什么图` because it tried to open the prompt as a file.
+      // Two safe encodings:
+      //   1. Put prompt FIRST positional, then --file flags last
+      //   2. Use `--` to terminate options before prompt
+      // We do (2) — clearer for log readability.
       const args = [
         'run',
         '--format',
@@ -109,6 +118,7 @@ export class OpenCodeProvider implements Provider {
         ...(options.sessionId ? ['--session', options.sessionId] : []),
         ...(options.model ? ['--model', options.model] : []),
         ...imageFiles.flatMap((f) => ['--file', f]),
+        ...(imageFiles.length > 0 ? ['--'] : []),
         prompt
       ]
 
