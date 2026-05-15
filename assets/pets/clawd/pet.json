@@ -1,6 +1,6 @@
 {
-  "id": "clawd-default",
-  "displayName": "Clawd（内置）",
-  "description": "默认宠物。可在切换菜单换成 ~/.petdex 或 ~/.claude/pets 下的其他 pet。",
+  "id": "clawd",
+  "displayName": "Clawd",
+  "description": "默认宠物。装其他 sprite 包到 ~/.petdex/pets 或 ~/.claude-pets/pets 可在切换菜单看到。",
   "spritesheetPath": "spritesheet.webp"
 }

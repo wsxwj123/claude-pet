@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import type { PetDescriptor } from '../../../shared/types'
 import type { ChatMessage, PendingTurn, ProviderDescriptor } from '../App'
 import { Icon } from './Icon'
+import { toFileUrl } from '../fileUrl'
 
 type View = 'root' | 'pets' | 'size' | 'history' | 'settings' | 'chat' | 'agent' | 'shortcuts'
 
@@ -1286,7 +1287,7 @@ const PetThumb: React.FC<{ spritesheetAbsPath: string }> = ({ spritesheetAbsPath
         display: 'inline-block',
         width: THUMB_W,
         height: THUMB_H,
-        backgroundImage: `url(file://${spritesheetAbsPath})`,
+        backgroundImage: `url("${toFileUrl(spritesheetAbsPath)}")`,
         backgroundRepeat: 'no-repeat',
         backgroundPosition: '0 0',
         backgroundSize: `${SHEET_W * scaleX}px ${SHEET_H * scaleY}px`,

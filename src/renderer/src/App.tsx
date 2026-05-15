@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { PetWidget } from './components/PetWidget'
 import type { AnimState } from './hooks/usePetAnimation'
 import type { PetDescriptor, ScreenBounds } from '../../shared/types'
+import { toFileUrl } from './fileUrl'
 
 export interface ChatMessage {
   id: string
@@ -94,7 +95,7 @@ export default function App(): React.ReactElement {
           window.petAPI.listProviders()
         ])
         const activePet = pets.find((p) => p.id === config.activePet) ?? pets[0] ?? null
-        const spritesheetUrl = activePet ? `file://${activePet.spritesheetAbsPath}` : null
+        const spritesheetUrl = activePet ? toFileUrl(activePet.spritesheetAbsPath) : null
 
         let chatMessages: ChatMessage[] = []
         let activeSessionId: string | null = activeId
@@ -161,7 +162,7 @@ export default function App(): React.ReactElement {
           ...prev,
           petScale: config.petScale,
           activePetId: config.activePet,
-          spritesheetUrl: pet ? `file://${pet.spritesheetAbsPath}` : prev.spritesheetUrl
+          spritesheetUrl: pet ? toFileUrl(pet.spritesheetAbsPath) : prev.spritesheetUrl
         }
       })
     })
@@ -286,7 +287,7 @@ export default function App(): React.ReactElement {
       setState((prev) => ({
         ...prev,
         activePetId: petId,
-        spritesheetUrl: pet ? `file://${pet.spritesheetAbsPath}` : prev.spritesheetUrl
+        spritesheetUrl: pet ? toFileUrl(pet.spritesheetAbsPath) : prev.spritesheetUrl
       }))
     } catch (err) {
       console.error('[App] changePet error:', err)
