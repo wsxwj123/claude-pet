@@ -18,9 +18,13 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-      - name: Install
-        run: npm ci --no-audit --no-fund
+      # --ignore-scripts skips electron's postinstall which downloads
+      # the ~100 MB Electron binary from GitHub Releases — flaky on
+      # CI and unnecessary for typecheck-only validation. The release
+      # workflow does the full install.
+      - name: Install (no scripts)
+        run: npm ci --no-audit --no-fund --ignore-scripts
       - name: Typecheck
         run: npm run typecheck
-      - name: Build (smoke)
+      - name: Build renderer + main (skips needing electron binary)
         run: npx electron-vite build

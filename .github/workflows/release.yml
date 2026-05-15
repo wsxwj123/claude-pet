@@ -62,8 +62,35 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+      # Cache Electron's ~100 MB binary across runs so a flaky
+      # GitHub Releases response doesn't fail the install.
+      - name: Cache Electron download
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: ${{ matrix.runner }}-electron-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ matrix.runner }}-electron-
+
+      - name: Install dependencies (retry on Electron download flake)
+        shell: bash
+        run: |
+          set -e
+          for i in 1 2 3; do
+            if npm ci --no-audit --no-fund; then
+              exit 0
+            fi
+            echo "::warning::npm ci attempt $i failed, retrying in 15s..."
+            sleep 15
+          done
+          echo "::error::npm ci failed after 3 attempts"
+          exit 1
 
       - name: Typecheck
         run: npm run typecheck
