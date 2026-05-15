@@ -75,8 +75,13 @@ function basename(p: string): string {
  * the user back to the agent UI, or null if we can't determine one.
  * Async so the main event loop isn't blocked while shelling out to ps
  * up to 12 times during hot hook traffic.
+ *
+ * Non-macOS platforms return null immediately — `ps` flag syntax + the
+ * Mac-specific TERMINAL_NAMES / KNOWN_AGENT_APPS list don't translate
+ * to Windows or Linux GUI app discovery anyway.
  */
 export async function resolveOwningApp(pid: number): Promise<string | null> {
+  if (process.platform !== 'darwin') return null
   let current = pid
   for (let depth = 0; depth < 12; depth++) {
     const info = await getProc(current)

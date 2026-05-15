@@ -111,7 +111,7 @@ export const HoverMenu: React.FC<HoverMenuProps> = ({
   // where the user installed new pets via petdex while pet was running.
   useEffect(() => {
     if (view === 'pets') onReloadPets?.()
-  }, [view])
+  }, [view, onReloadPets])
 
   // Chat panel size is user-resizable + persisted. Load saved values
   // lazily from PetConfig once on mount; updates are saved after the
@@ -476,7 +476,7 @@ export const HoverMenu: React.FC<HoverMenuProps> = ({
                   className="text-[10px] text-slate-400 truncate flex-shrink-0"
                   style={{ maxWidth: 90 }}
                 >
-                  {p.configDir.replace(/^.*\//, '…/')}
+                  {p.configDir.replace(/^.*[\\/]/, '…/')}
                 </span>
               </button>
             ))

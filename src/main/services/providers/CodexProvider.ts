@@ -200,9 +200,11 @@ export class CodexProvider implements Provider {
 
       proc.on('error', (err) => {
         console.error('[CodexProvider] spawn error:', err.message)
-        callbacks.onError?.(err.message)
-        this.agentState?.handleHook('codex', 'stop')
-        resolve('')
+        // Route through finish() so the temp image files get cleaned up
+        // and the agentState 'stop' hook fires exactly once. Marking
+        // errorMsg first means finish() takes the error path.
+        errorMsg = err.message
+        finish(null)
       })
 
       proc.on('exit', (code) => {

@@ -464,6 +464,23 @@ export default function App(): React.ReactElement {
           ...prev,
           chatAttachments: [...prev.chatAttachments, att]
         }))
+        return
+      }
+      // Surface non-ok captures into the chat so users on platforms
+      // where screenshots aren't supported (Linux/Windows) see WHY
+      // the click did nothing instead of silently swallowing.
+      if (r.reason && r.reason !== 'canceled') {
+        const msg =
+          r.reason === 'unsupported'
+            ? '截图功能暂只支持 macOS（基于 screencapture 实现）'
+            : `截图失败：${r.error ?? r.reason}`
+        setState((prev) => ({
+          ...prev,
+          chatMessages: [
+            ...prev.chatMessages,
+            { id: `e-${Date.now()}`, role: 'error', text: msg }
+          ]
+        }))
       }
     },
     []

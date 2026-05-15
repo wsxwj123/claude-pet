@@ -114,8 +114,11 @@ export const PetWidget: React.FC<PetWidgetProps> = ({
       }
     })
     return cleanup
-    // handleScreenshot is defined below using useCallback so it's
-    // stable across renders; safe to omit from deps.
+    // handleScreenshot is defined later in this function as a plain
+    // const arrow. By the time the IPC callback fires, the const is
+    // bound; we deliberately keep it out of deps to avoid recreating
+    // the IPC listener on every render. onNewSession from props is
+    // already useCallback-stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onNewSession])
 
@@ -291,6 +294,10 @@ export const PetWidget: React.FC<PetWidgetProps> = ({
     onClearAttachments()
     onNewSession()
     onCaptureScreen('region')
+    // Force the menu open — without this, Tray / global-shortcut
+    // triggered screenshots take the picture but never show the chat
+    // panel (pendingOpenView is only honored once menuVisible=true).
+    setMenuVisible(true)
     setPendingOpenView('chat')
   }
   const handleSettings = (): void => {

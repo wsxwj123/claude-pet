@@ -68,6 +68,14 @@ export interface AgentInjectionResult {
 }
 
 function buildCommand(helperPath: string, kind: string, agentSource: string): string {
+  // Cross-platform hook command: silence stdout/stderr so the agent
+  // CLI's output isn't polluted by our helper. Bash redirections
+  // (`>/dev/null 2>&1 || true`) don't work on Windows cmd.exe — there
+  // we use `>NUL 2>&1` and skip the `|| true` (Windows cmd treats hook
+  // failures lazily anyway).
+  if (process.platform === 'win32') {
+    return `node "${helperPath}" ${kind} ${agentSource} >NUL 2>&1`
+  }
   return `node "${helperPath}" ${kind} ${agentSource} >/dev/null 2>&1 || true`
 }
 

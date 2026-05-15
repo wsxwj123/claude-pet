@@ -1,5 +1,7 @@
 import { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, globalShortcut } from 'electron'
 import { spawn } from 'child_process'
+import fs from 'fs'
+import os from 'os'
 import path from 'path'
 import { ConfigStore } from './services/ConfigStore'
 import type { PetConfig, ScreenBounds } from '../shared/types'
@@ -304,22 +306,52 @@ ipcMain.handle('probe-shortcut', (_event, { accelerator }: { accelerator: string
 
 function getHelperPath(): string {
   // dev: __dirname = .../out/main → project root has bin/
-  // prod: __dirname inside app.asar → unpack lookup via process.resourcesPath
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'bin', 'claude-pets-hook.js')
+  if (!app.isPackaged) {
+    return path.join(__dirname, '..', '..', 'bin', 'claude-pets-hook.js')
   }
-  return path.join(__dirname, '..', '..', 'bin', 'claude-pets-hook.js')
+  // Production: we cannot just point hook injectors at
+  // `process.resourcesPath`, because on Linux AppImage that path is a
+  // FUSE mount under /tmp/.mount_<id>/ that changes EVERY launch. The
+  // hook command we write into ~/.claude/settings.json would go stale
+  // the moment pet exits and the mount unmounts. Copy the helper into
+  // a stable user-writable location and return that path instead.
+  const src = path.join(process.resourcesPath, 'bin', 'claude-pets-hook.js')
+  const stableDir = path.join(os.homedir(), '.claude-pets', 'bin')
+  const dst = path.join(stableDir, 'claude-pets-hook.js')
+  try {
+    fs.mkdirSync(stableDir, { recursive: true })
+    // Copy on every launch so an upgraded pet binary refreshes the
+    // helper script. Cheap (< 5 KB file).
+    fs.copyFileSync(src, dst)
+    return dst
+  } catch (err) {
+    console.warn(
+      '[getHelperPath] could not copy helper to stable location, falling back to resourcesPath:',
+      err instanceof Error ? err.message : err
+    )
+    return src
+  }
 }
 
 ipcMain.handle('reinject-hooks', () => injectAllHooks(getHelperPath()))
 
 // Double-click on pet → activate the macOS app that owns the most
 // recently active agent (Claude Desktop / Codex / Terminal / iTerm2 …).
+// macOS-only: uses `open -a <AppName>`. Linux/Windows just no-op.
 ipcMain.handle('activate-recent-agent', () => {
+  if (process.platform !== 'darwin') {
+    return { ok: false, reason: 'app activation only supported on macOS' }
+  }
   const appName = agentState.getMostRecentOwningApp()
   if (!appName) return { ok: false, reason: 'no owning app recorded yet' }
   try {
-    spawn('open', ['-a', appName], { detached: true, stdio: 'ignore' }).unref()
+    // Attach .on('error') so an ENOENT (PATH or missing `open`) doesn't
+    // become an unhandled exception that crashes main.
+    const child = spawn('open', ['-a', appName], { detached: true, stdio: 'ignore' })
+    child.on('error', (err) => {
+      console.warn('[activate-recent-agent] spawn error:', err.message)
+    })
+    child.unref()
     return { ok: true, app: appName }
   } catch (err) {
     return { ok: false, reason: err instanceof Error ? err.message : String(err) }

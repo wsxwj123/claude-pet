@@ -103,12 +103,19 @@ export class JsonProvider implements Provider {
         .map((c) => c.text as string)
         .join('\n')
 
-      const args = (this.spec.args ?? []).map((a) =>
-        a
-          .replace(/{prompt}/g, this.spec.stdinPrompt ? '' : promptText)
-          .replace(/{model}/g, options.model ?? this.spec.defaultModel ?? '')
-          .replace(/{sessionId}/g, options.sessionId ?? '')
-      )
+      const args = (this.spec.args ?? [])
+        .map((a) =>
+          a
+            .replace(/{prompt}/g, this.spec.stdinPrompt ? '' : promptText)
+            .replace(/{model}/g, options.model ?? this.spec.defaultModel ?? '')
+            .replace(/{sessionId}/g, options.sessionId ?? '')
+        )
+        // Drop args that ended up as empty strings after template
+        // substitution. e.g. spec `["{prompt}"]` with stdinPrompt:true
+        // would otherwise pass `""` as a positional arg, which most
+        // CLIs reject. Side note: a deliberate empty `""` in the
+        // template is a misconfiguration we don't support.
+        .filter((a) => a !== '')
 
       const { command, shell } = resolveSpawn(this.spec.binary)
       const proc: ChildProcess = spawn(command, args, {
