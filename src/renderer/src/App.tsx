@@ -169,9 +169,17 @@ export default function App(): React.ReactElement {
 
     // Stream chat events into global state so the chat panel can be
     // closed and re-opened without losing in-flight turns or history.
+    //
+    // Multi-session correctness: a chat-event always carries the
+    // session it belongs to. If the user has switched away to a
+    // different session while a turn is mid-flight, we MUST NOT
+    // mutate the displayed chatMessages array (it belongs to the new
+    // session). Main's ChatStore persists the reply to the correct
+    // session regardless — when the user switches back, getChatSession
+    // returns the up-to-date history.
     const cleanupChat = window.petAPI.onChatEvent((event) => {
-      // After every turn, refresh the session list so the history submenu
-      // and titles stay in sync with the store.
+      // Always refresh sessions list on terminal events, regardless
+      // of which session — the title preview / sort order changes.
       if (event.kind === 'done' || event.kind === 'error') {
         window.petAPI
           .listChatSessions()
@@ -189,10 +197,23 @@ export default function App(): React.ReactElement {
       }
       setState((prev) => {
         if (event.kind === 'start') {
+          // Lazy-session sync: if activeSessionId is null (user just
+          // clicked 新对话 and hasn't picked one yet) bind it to the
+          // newly-created session id. Otherwise leave alone — don't
+          // hijack the user back from whatever they're viewing.
+          const nextActive =
+            prev.activeSessionId == null && event.sessionId
+              ? event.sessionId
+              : prev.activeSessionId
+          // Only set pendingTurn (the "thinking" bubble) if this
+          // event belongs to the session the user is currently
+          // viewing. Background turns don't get a visible bubble.
+          if (event.sessionId && event.sessionId !== nextActive) {
+            return { ...prev, activeSessionId: nextActive }
+          }
           return {
             ...prev,
-            // Sync activeSessionId for newly-created sessions (lazy mode)
-            activeSessionId: event.sessionId ?? prev.activeSessionId,
+            activeSessionId: nextActive,
             pendingTurn: {
               turnId: event.turnId,
               partialText: '',
@@ -200,19 +221,34 @@ export default function App(): React.ReactElement {
             }
           }
         }
+        // For chunk / done / error: only mutate visible state when
+        // BOTH the turnId matches our tracked pendingTurn (guards
+        // against stale events after switch+overwrite) AND the
+        // event's sessionId is what's currently displayed.
+        const isForCurrentView =
+          event.sessionId == null || event.sessionId === prev.activeSessionId
+        const matchesPending =
+          prev.pendingTurn && prev.pendingTurn.turnId === event.turnId
+
         if (event.kind === 'chunk') {
-          if (!prev.pendingTurn || prev.pendingTurn.turnId !== event.turnId) return prev
+          if (!matchesPending || !isForCurrentView) return prev
           return {
             ...prev,
             pendingTurn: {
-              ...prev.pendingTurn,
-              partialText: prev.pendingTurn.partialText + (event.text ?? '')
+              ...prev.pendingTurn!,
+              partialText: prev.pendingTurn!.partialText + (event.text ?? '')
             }
           }
         }
         if (event.kind === 'done') {
-          if (!prev.pendingTurn || prev.pendingTurn.turnId !== event.turnId) return prev
-          const finalText = event.text ?? prev.pendingTurn.partialText
+          if (!isForCurrentView) {
+            // Background session finished. Just drop pendingTurn if
+            // it happens to belong to that turn; otherwise no-op.
+            if (matchesPending) return { ...prev, pendingTurn: null }
+            return prev
+          }
+          if (!matchesPending) return prev
+          const finalText = event.text ?? prev.pendingTurn!.partialText
           return {
             ...prev,
             pendingTurn: null,
@@ -224,7 +260,11 @@ export default function App(): React.ReactElement {
           }
         }
         if (event.kind === 'error') {
-          if (!prev.pendingTurn || prev.pendingTurn.turnId !== event.turnId) return prev
+          if (!isForCurrentView) {
+            if (matchesPending) return { ...prev, pendingTurn: null }
+            return prev
+          }
+          if (!matchesPending) return prev
           const errText = event.error ?? 'unknown error'
           return {
             ...prev,
@@ -233,8 +273,6 @@ export default function App(): React.ReactElement {
               ...prev.chatMessages,
               { id: `e-${event.turnId}`, role: 'error', text: errText }
             ],
-            // Surface errors in the status-label preview too so the user
-            // can spot them even with the chat panel closed.
             replyPreview: { text: '出错: ' + errText, completedAt: Date.now() }
           }
         }
@@ -451,6 +489,13 @@ export default function App(): React.ReactElement {
       ...prev,
       activeSessionId: sessionId,
       chatMessages: session.messages.map((m) => ({ id: m.id, role: m.role, text: m.text })),
+      // Switching sessions while another turn is in flight: drop the
+      // visible pendingTurn so the new session's view doesn't show a
+      // stale "对方正在输入" bubble that actually belongs to the
+      // session we just left. The background turn keeps streaming;
+      // when the user switches back its result is in the persisted
+      // history (ChatStore got it via main).
+      pendingTurn: null,
       replyPreview: null
     }))
   }, [])
