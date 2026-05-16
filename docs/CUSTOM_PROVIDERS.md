@@ -1,6 +1,6 @@
 # 自定义 Provider
 
-claude-pets 自带 2 个内置 provider（`claude-cli`、`opencode`）。
+claude-pets 自带 4 个内置 provider（`claude-cli`、`codex`、`opencode`、`openclaude`）。
 第三方 agent CLI 可以通过一份 JSON 文件接入，无需改 pet 代码。
 
 ## 怎么加

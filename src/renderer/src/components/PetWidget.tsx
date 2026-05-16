@@ -200,6 +200,19 @@ export const PetWidget: React.FC<PetWidgetProps> = ({
   const effectiveState: AnimState = dragOverrideState ?? agentAnimState
   const spriteStyle = usePetAnimation(effectiveState)
 
+  // Face toward screen center: when the pet is in the right half of the
+  // screen, mirror the sprite horizontally so it looks "inward" instead
+  // of off-screen. For movement states (running-right / running-left)
+  // the spritesheet already provides correct directional frames, so
+  // skip flipping those — flipping a `running-right` frame just because
+  // the pet happens to be on the right would make it look like the pet
+  // is running BACKWARDS.
+  const isDirectional =
+    effectiveState === 'running-right' || effectiveState === 'running-left'
+  const petCenterX = pos.x + petWidth / 2
+  const facingLeft = !isDirectional && petCenterX > screenBounds.width / 2
+  const facingTransform = facingLeft ? 'scaleX(-1)' : undefined
+
   const handleDragStateChange = useCallback((state: AnimState | null) => {
     setDragOverrideState(state)
   }, [])
@@ -380,7 +393,13 @@ export const PetWidget: React.FC<PetWidgetProps> = ({
               backgroundRepeat: 'no-repeat',
               imageRendering: 'pixelated',
               cursor: 'grab',
-              ...spriteStyle
+              ...spriteStyle,
+              transform: facingTransform ?? 'none',
+              transformOrigin: 'center center',
+              // Smooth flip when crossing screen midline (drag releases
+              // on the other side). Only transform animates; sprite
+              // frame animation is driven by backgroundPosition.
+              transition: 'transform 220ms ease-out'
             }}
           ></div>
         ) : (

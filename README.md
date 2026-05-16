@@ -222,15 +222,22 @@ npm run package      # 打 dmg 到 release/
 
 - [x] 多 provider 抽象 + 内置 4 个（Claude Code / Codex / opencode / openclaude）
 - [x] 自定义 JSON provider
-- [x] 多会话历史 + 流式 + 多图附件
-- [x] 截图分析 + 语音输入
+- [x] 多会话历史 + 流式 + 多图附件 + 跨 session 隔离
+- [x] 截图分析（macOS / Windows / Linux 各平台原生）
+- [x] 语音输入（local SenseVoice STT）
 - [x] 全局快捷键 + chat panel resize + pin
-- [x] 跨平台 binary auto-detect
+- [x] 跨平台 binary auto-detect（含 macOS .app bundle / Linux AppImage）
 - [x] 多 agent 同时状态显示
-- [ ] **D2 边缘吸附 sprite**（需要美术，prompt 已写）
+- [x] 跨平台打包（macOS arm64/x64 · Windows x64 · Linux x64/arm64 AppImage+deb）
+- [x] GitHub Actions 自动 release workflow
+- [ ] **D2 边缘吸附 sprite**（需要美术，prompt 已写在 [docs/GENERATING_PET_ASSETS.md](docs/GENERATING_PET_ASSETS.md)）
 - [ ] 危险工具调用确认弹窗
-- [ ] Windows / Linux 实测打包
-- [ ] 国际化（i18n）
+- [ ] 代码签名（macOS Developer ID + Windows EV cert，消除 Gatekeeper / SmartScreen 警告）
+- [ ] auto-update（electron-updater）
+- [ ] 开机自启 toggle
+- [ ] 国际化（i18n 英文 UI）
+
+当前版本：v0.1.5。版本历史见 [Releases](https://github.com/wsxwj123/claude-pet/releases)。
 
 ---
 
