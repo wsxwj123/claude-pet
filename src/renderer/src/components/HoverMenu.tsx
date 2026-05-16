@@ -322,9 +322,23 @@ export const HoverMenu: React.FC<HoverMenuProps> = ({
     }
   }, [attachments.length, view])
 
-  // Paste image from clipboard into the textarea
+  // Clipboard paste behavior:
+  // - Pure image (screenshot, web image copy without text):
+  //   attach as image
+  // - Word / Excel / browser rich-content (text + auto-generated
+  //   preview image): prefer the TEXT, let textarea's default paste
+  //   handle it. Otherwise pasting from Word always lost the text.
+  // - Cmd+Shift+V on macOS / Ctrl+Shift+V on Win = plain text paste
+  //   from the OS — works automatically as long as we don't
+  //   preventDefault when text is present.
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>): void => {
-    const items = e.clipboardData?.items
+    const cd = e.clipboardData
+    if (!cd) return
+    const text = cd.getData('text/plain')
+    // If meaningful text is on the clipboard, let the textarea paste
+    // it natively — don't hijack with the image branch.
+    if (text && text.length > 0) return
+    const items = cd.items
     if (!items) return
     for (let i = 0; i < items.length; i++) {
       const item = items[i]

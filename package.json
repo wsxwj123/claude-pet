@@ -1,6 +1,6 @@
 {
   "name": "claude-pets",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Desktop pet + universal agent CLI shell — drag a transparent pet onto your screen, chat with Claude / Codex / opencode through a single interface.",
   "main": "out/main/index.js",
   "author": {
