@@ -14,6 +14,10 @@ export interface PendingTurn {
   turnId: number
   partialText: string
   startedAt: number
+  /** Which chat session this turn belongs to (needed for session
+   *  switching — we don't clear pendingTurn when switching back to
+   *  the same in-flight session). */
+  sessionId?: string
 }
 
 export interface ReplyPreview {
@@ -209,7 +213,18 @@ export default function App(): React.ReactElement {
           // event belongs to the session the user is currently
           // viewing. Background turns don't get a visible bubble.
           if (event.sessionId && event.sessionId !== nextActive) {
-            return { ...prev, activeSessionId: nextActive }
+            // Background turn — still tag pendingTurn with its
+            // session so a later switch-back can recover it.
+            return {
+              ...prev,
+              activeSessionId: nextActive,
+              pendingTurn: {
+                turnId: event.turnId,
+                partialText: '',
+                startedAt: Date.now(),
+                sessionId: event.sessionId
+              }
+            }
           }
           return {
             ...prev,
@@ -217,7 +232,8 @@ export default function App(): React.ReactElement {
             pendingTurn: {
               turnId: event.turnId,
               partialText: '',
-              startedAt: Date.now()
+              startedAt: Date.now(),
+              sessionId: event.sessionId ?? nextActive ?? undefined
             }
           }
         }
@@ -247,7 +263,31 @@ export default function App(): React.ReactElement {
             if (matchesPending) return { ...prev, pendingTurn: null }
             return prev
           }
-          if (!matchesPending) return prev
+          if (!matchesPending) {
+            // 'done' is for the session the user is currently viewing,
+            // but we don't have a matching pendingTurn — usually means
+            // they switched away and back while the turn was in flight,
+            // so the in-memory chatMessages array doesn't include the
+            // assistant reply. Refresh from ChatStore as a safety net.
+            // (Main always persists the message before sending 'done'.)
+            if (event.sessionId) {
+              window.petAPI
+                .getChatSession(event.sessionId)
+                .then((s) => {
+                  if (!s) return
+                  setState((p) => ({
+                    ...p,
+                    chatMessages: s.messages.map((m) => ({
+                      id: m.id,
+                      role: m.role,
+                      text: m.text
+                    }))
+                  }))
+                })
+                .catch(() => undefined)
+            }
+            return prev
+          }
           const finalText = event.text ?? prev.pendingTurn!.partialText
           return {
             ...prev,
@@ -264,7 +304,27 @@ export default function App(): React.ReactElement {
             if (matchesPending) return { ...prev, pendingTurn: null }
             return prev
           }
-          if (!matchesPending) return prev
+          if (!matchesPending) {
+            // Same safety net as 'done': re-sync from ChatStore in
+            // case the user switched away while the turn errored.
+            if (event.sessionId) {
+              window.petAPI
+                .getChatSession(event.sessionId)
+                .then((s) => {
+                  if (!s) return
+                  setState((p) => ({
+                    ...p,
+                    chatMessages: s.messages.map((m) => ({
+                      id: m.id,
+                      role: m.role,
+                      text: m.text
+                    }))
+                  }))
+                })
+                .catch(() => undefined)
+            }
+            return prev
+          }
           const errText = event.error ?? 'unknown error'
           return {
             ...prev,
@@ -489,13 +549,16 @@ export default function App(): React.ReactElement {
       ...prev,
       activeSessionId: sessionId,
       chatMessages: session.messages.map((m) => ({ id: m.id, role: m.role, text: m.text })),
-      // Switching sessions while another turn is in flight: drop the
-      // visible pendingTurn so the new session's view doesn't show a
-      // stale "对方正在输入" bubble that actually belongs to the
-      // session we just left. The background turn keeps streaming;
-      // when the user switches back its result is in the persisted
-      // history (ChatStore got it via main).
-      pendingTurn: null,
+      // Keep pendingTurn ONLY if it belongs to the session we're
+      // switching to (user is returning to a still-in-flight chat).
+      // Drop it if it belongs to some other session — that turn's
+      // bubble shouldn't show in the new view; it will eventually
+      // persist its reply into ChatStore which we'll see on next
+      // switch back.
+      pendingTurn:
+        prev.pendingTurn && prev.pendingTurn.sessionId === sessionId
+          ? prev.pendingTurn
+          : null,
       replyPreview: null
     }))
   }, [])
