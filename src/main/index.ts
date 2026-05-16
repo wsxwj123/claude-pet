@@ -419,14 +419,14 @@ function runChatTurn(
         }
       },
       onChunk: (delta) =>
-        win?.webContents.send('chat-event', { turnId, kind: 'chunk', text: delta }),
+        win?.webContents.send('chat-event', { turnId, kind: 'chunk', sessionId, text: delta }),
       onDone: (finalText) => {
         chatStore.appendMessage(sessionId, { id: `a-${turnId}`, role: 'assistant', text: finalText })
-        win?.webContents.send('chat-event', { turnId, kind: 'done', text: finalText })
+        win?.webContents.send('chat-event', { turnId, kind: 'done', sessionId, text: finalText })
       },
       onError: (err) => {
         chatStore.appendMessage(sessionId, { id: `e-${turnId}`, role: 'error', text: err })
-        win?.webContents.send('chat-event', { turnId, kind: 'error', error: err })
+        win?.webContents.send('chat-event', { turnId, kind: 'error', sessionId, error: err })
       }
     }
   )
