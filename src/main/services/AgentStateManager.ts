@@ -171,10 +171,15 @@ function stateLabel(state: AnimState, tool: ToolContext): string {
       const t = toolText(tool, false)
       return t ?? GENERIC_STATE_TEXT.running
     }
+    case 'review': {
+      // Between tool calls / after a PostToolUse: show what we JUST
+      // did in past-tense ("已读 foo.ts") instead of generic "思考中".
+      // This way the bubble carries meaningful context until the next
+      // event arrives, rather than flashing the tool name for 200ms.
+      const t = toolText(tool, true)
+      return t ?? GENERIC_STATE_TEXT.review
+    }
     case 'idle': {
-      // post: show "Read foo.ts" briefly via flash? No — post immediately
-      // returns to idle which hides the label. So past-tense isn't shown.
-      // (We still expose it for callers that want it.)
       return GENERIC_STATE_TEXT.idle
     }
     default:
@@ -201,6 +206,17 @@ export class AgentStateManager {
   ): void {
     const newState = this.kindToState(kind)
     const entry = this.agents.get(agentSource) ?? { state: 'idle', lastActiveAt: 0 }
+
+    // Cross-process noise filter: when a tool is actively running for
+    // this source, a UserPromptSubmit must be from somewhere ELSE — a
+    // sub-agent (Task tool), a parallel claude in another terminal,
+    // or claude-code's internal turn machinery firing the hook again.
+    // Letting it through resets the bubble to "收到" / "思考中" and
+    // destroys the tool name display. The main agent will produce its
+    // own user/pre when it's actually that session's turn.
+    if (kind === 'user' && entry.state === 'running') {
+      return
+    }
 
     if (tool) {
       this.lastTool.set(agentSource, tool)
@@ -248,8 +264,12 @@ export class AgentStateManager {
     switch (kind) {
       case 'pre':
         return 'running'
+      // PostToolUse used to flip to 'idle' (label hidden), so the tool
+      // name vanished the instant the tool returned. Now we sit in
+      // 'review' with past-tense tool text ("已读 foo.ts") until the
+      // next event — much more useful as a status indicator.
       case 'post':
-        return 'idle'
+        return 'review'
       case 'user':
         return 'jumping'
       case 'stop':
