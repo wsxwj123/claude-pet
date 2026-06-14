@@ -43,15 +43,21 @@ export class HookServer {
 
     if (req.method === 'POST' && req.url === '/bubble') {
       let body = ''
+      let oversize = false
       req.on('data', (chunk) => {
+        if (oversize) return
         body += chunk.toString()
         if (body.length > 65536) {
+          // Guard against a second oversize chunk re-sending headers,
+          // which would throw ERR_HTTP_HEADERS_SENT.
+          oversize = true
           res.writeHead(413)
           res.end('Payload too large')
           req.destroy()
         }
       })
       req.on('end', () => {
+        if (oversize) return
         try {
           const payload = JSON.parse(body) as {
             kind?: string

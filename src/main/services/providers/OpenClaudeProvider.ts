@@ -94,6 +94,8 @@ export class OpenClaudeProvider implements Provider {
       let finalResult: string | null = null
       let errorMsg: string | null = null
       let pushedUserHook = false
+      // Guard so error+exit can't both fire callbacks / the 'stop' hook.
+      let finished = false
 
       proc.stdout?.on('data', (chunk: Buffer) => {
         stdoutBuf += chunk.toString('utf-8')
@@ -126,6 +128,8 @@ export class OpenClaudeProvider implements Provider {
       })
 
       proc.on('error', (err) => {
+        if (finished) return
+        finished = true
         console.error('[OpenClaudeProvider] spawn error:', err.message)
         callbacks.onError?.(err.message)
         this.agentState?.handleHook('openclaude', 'stop')
@@ -133,6 +137,8 @@ export class OpenClaudeProvider implements Provider {
       })
 
       proc.on('exit', (code) => {
+        if (finished) return
+        finished = true
         console.log(
           `[OpenClaudeProvider] exit code=${code} resultLen=${finalResult?.length ?? 0} stderr=${stderrBuf.trim().slice(0, 200)}`
         )

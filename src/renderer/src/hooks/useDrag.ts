@@ -207,6 +207,12 @@ export function useDrag(options: DragOptions): {
       window.removeEventListener('pointerup', onPointerUp)
       window.removeEventListener('pointercancel', onPointerUp)
       cancelMomentum()
+      // Cancel a deferred single-click so it can't fire onClick (and
+      // setState) after the component has unmounted.
+      if (pendingClickTimer.current) {
+        clearTimeout(pendingClickTimer.current)
+        pendingClickTimer.current = null
+      }
     }
   }, [onStateChange, onClick, onDoubleClick, throwWithVelocity, cancelMomentum])
 

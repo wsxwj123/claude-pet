@@ -76,6 +76,9 @@ export class ClaudeCliProvider implements Provider {
       let lastAssistantText = ''
       let finalResult: string | null = null
       let errorMsg: string | null = null
+      // Guard so error+exit can't both fire callbacks (a ghost onDone
+      // after onError would corrupt the renderer's chat state).
+      let finished = false
 
       proc.stdout?.on('data', (chunk: Buffer) => {
         stdoutBuf += chunk.toString('utf-8')
@@ -97,12 +100,16 @@ export class ClaudeCliProvider implements Provider {
       })
 
       proc.on('error', (err) => {
+        if (finished) return
+        finished = true
         console.error('[ClaudeCliProvider] spawn error:', err.message)
         callbacks.onError?.(err.message)
         resolve('')
       })
 
       proc.on('exit', (code) => {
+        if (finished) return
+        finished = true
         console.log(
           `[ClaudeCliProvider] exit code=${code} resultLen=${finalResult?.length ?? 0} stderr=${stderrBuf.trim().slice(0, 200)}`
         )

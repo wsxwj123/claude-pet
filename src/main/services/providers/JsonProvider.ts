@@ -172,11 +172,32 @@ export class JsonProvider implements Provider {
       })
 
       proc.on('error', (err) => {
+        // Release the agent state too — otherwise an ENOENT on spawn
+        // leaves the bubble stuck on the 'user' status pushed above.
+        this.agentState?.handleHook(this.spec.id, 'stop')
         callbacks.onError?.(err.message)
         resolve('')
       })
 
       proc.on('exit', (code) => {
+        // Flush a trailing JSON line that lacked a final newline — many
+        // CLIs emit their last event without one, which would otherwise
+        // be silently dropped.
+        if (eventsKind !== 'text-stream' && stdoutBuf.trim()) {
+          try {
+            const event = JSON.parse(stdoutBuf.trim())
+            const textPath = this.spec.events?.textPath
+            if (textPath) {
+              const t = getByPath(event, textPath)
+              if (typeof t === 'string' && t.length > 0) {
+                accumulatedText += t
+                callbacks.onChunk?.(t)
+              }
+            }
+          } catch {
+            // ignore malformed trailing line
+          }
+        }
         // Always release the agent state on exit so the bubble doesn't
         // stay stuck on the last status.
         this.agentState?.handleHook(this.spec.id, 'stop')
