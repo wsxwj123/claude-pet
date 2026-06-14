@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('petAPI', {
 
   getScreenBounds: (): Promise<ScreenBounds> => ipcRenderer.invoke('get-screen-bounds'),
 
+  openExternal: (url: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('open-external', { url }),
+
   getPets: (): Promise<PetDescriptor[]> => ipcRenderer.invoke('get-pets'),
 
   setActivePet: (petId: string): Promise<PetConfig> => {

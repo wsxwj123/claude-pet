@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, globalShortcut } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, shell, Tray, Menu, nativeImage, globalShortcut } from 'electron'
 import { spawn } from 'child_process'
 import fs from 'fs'
 import os from 'os'
@@ -244,6 +244,12 @@ function createTray(): void {
 }
 
 ipcMain.handle('get-screen-bounds', () => getWorkArea())
+
+ipcMain.handle('open-external', (_event, { url }: { url: string }) => {
+  if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return { ok: false }
+  void shell.openExternal(url)
+  return { ok: true }
+})
 
 ipcMain.on('set-ignore-mouse-events', (_event, ignore: boolean) => {
   if (!win) return

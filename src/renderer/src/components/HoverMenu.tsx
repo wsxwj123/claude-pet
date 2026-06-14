@@ -586,17 +586,19 @@ export const HoverMenu: React.FC<HoverMenuProps> = ({
     <>
       {backHeader('大小')}
       <div className="my-1.5 border-t border-slate-200/60" />
-      {SCALE_OPTIONS.map((opt) =>
-        menuItem(
-          opt.value === petScale ? <Icon name="check" /> : <span className="w-4 h-4" />,
-          opt.label,
-          () => {
-            onScaleChange(opt.value)
-            setView('root')
-          },
-          opt.value === petScale
-        )
-      )}
+      {SCALE_OPTIONS.map((opt) => (
+        <React.Fragment key={opt.value}>
+          {menuItem(
+            opt.value === petScale ? <Icon name="check" /> : <span className="w-4 h-4" />,
+            opt.label,
+            () => {
+              onScaleChange(opt.value)
+              setView('root')
+            },
+            opt.value === petScale
+          )}
+        </React.Fragment>
+      ))}
     </>
   )
 
@@ -1311,47 +1313,275 @@ const PetThumb: React.FC<{ spritesheetAbsPath: string }> = ({ spritesheetAbsPath
   )
 }
 
+// Minimal inline-markdown renderer for assistant chat bubbles.
+// Handles: **bold**, *italic* / _italic_, `code`, [text](url), and
+// auto-links bare http(s) URLs. Returns an array of React nodes.
+function renderInline(text: string, keyBase: string): React.ReactNode[] {
+  const nodes: React.ReactNode[] = []
+  // Tokenize in priority order: code, bold, italic-underscore, italic-star,
+  // explicit link, bare URL. Each match captures the original substring so
+  // we can splice around it. The underscore-italic arm is guarded by
+  // non-word lookbehind/lookahead so snake_case identifiers (my_var_name)
+  // are NOT mangled into italics.
+  const pattern =
+    /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(?<!\w)(_[^_\n]+_)(?!\w)|(\*[^*\n]+\*)|(\[[^\]\n]+\]\([^)\s]+\))|(https?:\/\/[^\s)]+)/g
+  let last = 0
+  let m: RegExpExecArray | null
+  let i = 0
+  while ((m = pattern.exec(text)) !== null) {
+    if (m.index > last) nodes.push(text.slice(last, m.index))
+    const tok = m[0]
+    const k = `${keyBase}-${i++}`
+    if (m[1]) {
+      nodes.push(
+        <code
+          key={k}
+          style={{
+            background: 'rgba(0,0,0,0.06)',
+            padding: '1px 5px',
+            borderRadius: 4,
+            fontFamily:
+              'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+            fontSize: '0.92em'
+          }}
+        >
+          {tok.slice(1, -1)}
+        </code>
+      )
+    } else if (m[2]) {
+      nodes.push(<strong key={k}>{tok.slice(2, -2)}</strong>)
+    } else if (m[3]) {
+      nodes.push(<em key={k}>{tok.slice(1, -1)}</em>)
+    } else if (m[4]) {
+      nodes.push(<em key={k}>{tok.slice(1, -1)}</em>)
+    } else if (m[5]) {
+      const close = tok.indexOf(']')
+      const label = tok.slice(1, close)
+      const url = tok.slice(close + 2, -1)
+      nodes.push(
+        <a
+          key={k}
+          href={url}
+          onClick={(e) => {
+            e.preventDefault()
+            void window.petAPI.openExternal(url)
+          }}
+          style={{ color: 'inherit', textDecoration: 'underline' }}
+        >
+          {label}
+        </a>
+      )
+    } else if (m[6]) {
+      // Bare URL — strip trailing sentence punctuation ("see https://x.com.")
+      // so the period/comma/paren isn't swallowed into the link. The
+      // stripped tail is re-emitted as plain text.
+      let url = tok
+      let trail = ''
+      const tm = url.match(/[.,!?;:)\]'"]+$/)
+      if (tm) {
+        trail = tm[0]
+        url = url.slice(0, url.length - trail.length)
+      }
+      const bareUrl = url
+      nodes.push(
+        <a
+          key={k}
+          href={bareUrl}
+          onClick={(e) => {
+            e.preventDefault()
+            void window.petAPI.openExternal(bareUrl)
+          }}
+          style={{ color: 'inherit', textDecoration: 'underline' }}
+        >
+          {bareUrl}
+        </a>
+      )
+      if (trail) nodes.push(trail)
+    }
+    last = m.index + tok.length
+  }
+  if (last < text.length) nodes.push(text.slice(last))
+  return nodes
+}
+
+// Block-level markdown renderer. Walks the text line-by-line and emits:
+// fenced code blocks, ATX headings (# ##), unordered/ordered lists, and
+// paragraphs whose inline content goes through renderInline.
+function renderMarkdown(text: string): React.ReactNode {
+  const lines = text.split('\n')
+  const out: React.ReactNode[] = []
+  let i = 0
+  let key = 0
+
+  const codeBlockStyle: React.CSSProperties = {
+    background: 'rgba(0,0,0,0.06)',
+    padding: '8px 10px',
+    borderRadius: 6,
+    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+    fontSize: '0.9em',
+    overflowX: 'auto',
+    whiteSpace: 'pre',
+    margin: '4px 0'
+  }
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    // Fenced code block
+    const fence = line.match(/^```(\w*)\s*$/)
+    if (fence) {
+      const buf: string[] = []
+      i++
+      while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+        buf.push(lines[i])
+        i++
+      }
+      if (i < lines.length) i++ // skip closing fence
+      out.push(
+        <pre key={`c-${key++}`} style={codeBlockStyle}>
+          <code>{buf.join('\n')}</code>
+        </pre>
+      )
+      continue
+    }
+
+    // Heading
+    const h = line.match(/^(#{1,4})\s+(.*)$/)
+    if (h) {
+      const level = h[1].length
+      const sizes = ['1.15em', '1.08em', '1em', '0.95em']
+      out.push(
+        <div
+          key={`h-${key++}`}
+          style={{
+            fontSize: sizes[level - 1],
+            fontWeight: 700,
+            margin: '6px 0 2px',
+            lineHeight: 1.3
+          }}
+        >
+          {renderInline(h[2], `h${key}`)}
+        </div>
+      )
+      i++
+      continue
+    }
+
+    // Lists (group consecutive list lines)
+    const ulMatch = line.match(/^\s*[-*]\s+(.*)$/)
+    const olMatch = line.match(/^\s*\d+\.\s+(.*)$/)
+    if (ulMatch || olMatch) {
+      const ordered = !!olMatch
+      const items: string[] = []
+      while (i < lines.length) {
+        const u = lines[i].match(/^\s*[-*]\s+(.*)$/)
+        const o = lines[i].match(/^\s*\d+\.\s+(.*)$/)
+        if (ordered && o) items.push(o[1])
+        else if (!ordered && u) items.push(u[1])
+        else break
+        i++
+      }
+      const ListTag = ordered ? 'ol' : 'ul'
+      out.push(
+        <ListTag
+          key={`l-${key++}`}
+          style={{
+            margin: '4px 0',
+            paddingLeft: 20,
+            listStyleType: ordered ? 'decimal' : 'disc'
+          }}
+        >
+          {items.map((it, idx) => (
+            <li key={idx} style={{ margin: '1px 0' }}>
+              {renderInline(it, `li-${key}-${idx}`)}
+            </li>
+          ))}
+        </ListTag>
+      )
+      continue
+    }
+
+    // Blank line → paragraph break
+    if (line.trim() === '') {
+      // Avoid trailing whitespace collapse — emit a small spacer only if
+      // the previous element was not already a block separator.
+      out.push(<div key={`b-${key++}`} style={{ height: 4 }} />)
+      i++
+      continue
+    }
+
+    // Default: paragraph line. Join consecutive plain lines with <br/>.
+    const paraLines: string[] = [line]
+    i++
+    while (
+      i < lines.length &&
+      lines[i].trim() !== '' &&
+      !/^```/.test(lines[i]) &&
+      !/^#{1,4}\s/.test(lines[i]) &&
+      !/^\s*[-*]\s+/.test(lines[i]) &&
+      !/^\s*\d+\.\s+/.test(lines[i])
+    ) {
+      paraLines.push(lines[i])
+      i++
+    }
+    out.push(
+      <div key={`p-${key++}`} style={{ margin: '2px 0' }}>
+        {paraLines.flatMap((l, idx) => {
+          const nodes = renderInline(l, `p${key}-${idx}`)
+          return idx === 0 ? nodes : [<br key={`br-${idx}`} />, ...nodes]
+        })}
+      </div>
+    )
+  }
+  return out
+}
+
 const Bubble: React.FC<{
   role: ChatMessage['role']
   text: string
   pending?: boolean
   slow?: boolean
-}> = ({ role, text, pending, slow }) => (
-  <div
-    style={{
-      alignSelf: role === 'user' ? 'flex-end' : 'flex-start',
-      maxWidth: '85%',
-      padding: '7px 11px',
-      borderRadius: 12,
-      fontSize: 13,
-      lineHeight: 1.5,
-      whiteSpace: 'pre-wrap',
-      wordBreak: 'break-word',
-      background:
-        role === 'user'
-          ? '#3b82f6'
-          : role === 'error'
-          ? '#fef2f2'
-          : slow
-          ? '#fef3c7'
-          : '#f3f4f6',
-      color:
-        role === 'user'
-          ? '#fff'
-          : role === 'error'
-          ? '#b91c1c'
-          : slow
-          ? '#92400e'
-          : '#1f2937',
-      fontStyle: pending ? 'italic' : undefined,
-      opacity: pending ? 0.7 : 1,
-      // Allow text selection / copy inside chat bubbles. Elsewhere on
-      // the pet widget we want default non-selectable behaviour.
-      userSelect: 'text',
-      WebkitUserSelect: 'text',
-      cursor: 'text'
-    }}
-  >
-    {text}
-  </div>
-)
+}> = ({ role, text, pending, slow }) => {
+  // Only render markdown for assistant messages. User messages stay plain
+  // text so users see exactly what they sent. Error messages stay plain
+  // too — they're already short and we don't want stack-trace asterisks
+  // turning into italics.
+  const renderMd = role === 'assistant' && !pending
+  return (
+    <div
+      style={{
+        alignSelf: role === 'user' ? 'flex-end' : 'flex-start',
+        maxWidth: '85%',
+        padding: '7px 11px',
+        borderRadius: 12,
+        fontSize: 13,
+        lineHeight: 1.5,
+        whiteSpace: renderMd ? 'normal' : 'pre-wrap',
+        wordBreak: 'break-word',
+        background:
+          role === 'user'
+            ? '#3b82f6'
+            : role === 'error'
+            ? '#fef2f2'
+            : slow
+            ? '#fef3c7'
+            : '#f3f4f6',
+        color:
+          role === 'user'
+            ? '#fff'
+            : role === 'error'
+            ? '#b91c1c'
+            : slow
+            ? '#92400e'
+            : '#1f2937',
+        fontStyle: pending ? 'italic' : undefined,
+        opacity: pending ? 0.7 : 1,
+        userSelect: 'text',
+        WebkitUserSelect: 'text',
+        cursor: 'text'
+      }}
+    >
+      {renderMd ? renderMarkdown(text) : text}
+    </div>
+  )
+}

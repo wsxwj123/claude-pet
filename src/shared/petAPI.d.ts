@@ -20,6 +20,7 @@ export interface PetAPI {
     error?: string
   }>
   getScreenBounds(): Promise<ScreenBounds>
+  openExternal(url: string): Promise<{ ok: boolean }>
   getPets(): Promise<PetDescriptor[]>
   setActivePet(petId: string): Promise<PetConfig>
   getConfig(): Promise<PetConfig>
