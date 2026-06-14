@@ -237,7 +237,7 @@ npm run package      # 打 dmg 到 release/
 - [ ] 开机自启 toggle
 - [ ] 国际化（i18n 英文 UI）
 
-当前版本：v0.1.11。版本历史见 [Releases](https://github.com/wsxwj123/claude-pet/releases)。
+当前版本：v0.1.12。版本历史见 [Releases](https://github.com/wsxwj123/claude-pet/releases)。
 
 ---
 
