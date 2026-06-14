@@ -570,6 +570,10 @@ export const HoverMenu: React.FC<HoverMenuProps> = ({
           })
         )}
       </div>
+      <div className="my-1.5 border-t border-slate-200/60" />
+      {menuItem(<Icon name="store" />, '宠物市场', () => {
+        void window.petAPI.openExternal('https://petdex.dev/zh')
+      })}
       {onReloadPets && (
         <>
           <div className="my-1.5 border-t border-slate-200/60" />

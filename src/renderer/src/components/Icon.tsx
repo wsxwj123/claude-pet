@@ -35,6 +35,7 @@ export type IconName =
   | 'scissors'
   | 'monitor'
   | 'refresh'
+  | 'store'
   | 'chevron-left'
   | 'chevron-right'
   | 'check'
@@ -154,6 +155,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M21 3v5h-5" />
       <path d="M21 12a9 9 0 0 1-15.5 6.36L3 16" />
       <path d="M3 21v-5h5" />
+    </>
+  ),
+  // Storefront — pet marketplace
+  store: (
+    <>
+      <path d="M2 7l1.5-3h17L22 7M3 7v12a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V7M3 7h18M7 11h10" />
     </>
   ),
   'chevron-left': <path d="m15 18-6-6 6-6" />,
