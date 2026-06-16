@@ -233,11 +233,11 @@ npm run package      # 打 dmg 到 release/
 - [ ] **D2 边缘吸附 sprite**（需要美术，prompt 已写在 [docs/GENERATING_PET_ASSETS.md](docs/GENERATING_PET_ASSETS.md)）
 - [ ] 危险工具调用确认弹窗
 - [ ] 代码签名（macOS Developer ID + Windows EV cert，消除 Gatekeeper / SmartScreen 警告）
-- [ ] auto-update（electron-updater）
+- [x] app 内一键自更新（未签名自实现：检查 GitHub release → 下载 → 替换重启）
 - [ ] 开机自启 toggle
 - [ ] 国际化（i18n 英文 UI）
 
-当前版本：v0.1.12。版本历史见 [Releases](https://github.com/wsxwj123/claude-pet/releases)。
+当前版本：v0.1.13。版本历史见 [Releases](https://github.com/wsxwj123/claude-pet/releases)。
 
 ---
 
