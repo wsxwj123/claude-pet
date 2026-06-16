@@ -57,3 +57,26 @@ export interface DisplayState {
 }
 
 export type HookKind = 'pre' | 'post' | 'user' | 'stop' | 'notif'
+
+export interface UpdateAsset {
+  name: string
+  url: string
+  size: number
+}
+
+export interface UpdateCheckResult {
+  ok: boolean
+  currentVersion: string
+  latestVersion?: string
+  hasUpdate?: boolean
+  asset?: UpdateAsset
+  noAsset?: boolean
+  releasesPage: string
+  error?: string
+}
+
+export interface UpdateProgress {
+  receivedBytes: number
+  totalBytes: number
+  percent: number
+}

@@ -13,6 +13,7 @@ import { ChatContent } from './services/providers/Provider'
 import { ProviderRegistry } from './services/providers/ProviderRegistry'
 import { ChatStore } from './services/ChatStore'
 import { captureScreen, CaptureMode } from './services/ScreenCapture'
+import { checkForUpdate, downloadAndInstall, UpdateAsset } from './services/Updater'
 
 app.commandLine.appendSwitch('no-sandbox')
 
@@ -250,6 +251,12 @@ ipcMain.handle('open-external', (_event, { url }: { url: string }) => {
   void shell.openExternal(url)
   return { ok: true }
 })
+
+ipcMain.handle('check-update', () => checkForUpdate())
+
+ipcMain.handle('download-and-install-update', (_event, { asset }: { asset: UpdateAsset }) =>
+  downloadAndInstall(asset, (p) => win?.webContents.send('update-progress', p))
+)
 
 ipcMain.on('set-ignore-mouse-events', (_event, ignore: boolean) => {
   if (!win) return

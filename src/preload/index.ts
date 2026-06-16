@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { PetDescriptor, PetConfig, DisplayState, ScreenBounds } from '../shared/types'
+import type {
+  PetDescriptor,
+  PetConfig,
+  DisplayState,
+  ScreenBounds,
+  UpdateAsset,
+  UpdateCheckResult,
+  UpdateProgress
+} from '../shared/types'
 
 contextBridge.exposeInMainWorld('petAPI', {
   setIgnoreMouseEvents: (ignore: boolean): void => {
@@ -15,6 +23,17 @@ contextBridge.exposeInMainWorld('petAPI', {
 
   openExternal: (url: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('open-external', { url }),
+
+  checkUpdate: (): Promise<UpdateCheckResult> => ipcRenderer.invoke('check-update'),
+
+  downloadAndInstallUpdate: (asset: UpdateAsset): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('download-and-install-update', { asset }),
+
+  onUpdateProgress: (callback: (p: UpdateProgress) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, p: UpdateProgress): void => callback(p)
+    ipcRenderer.on('update-progress', handler)
+    return () => ipcRenderer.removeListener('update-progress', handler)
+  },
 
   getPets: (): Promise<PetDescriptor[]> => ipcRenderer.invoke('get-pets'),
 

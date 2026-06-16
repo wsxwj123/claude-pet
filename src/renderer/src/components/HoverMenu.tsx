@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import type { PetDescriptor } from '../../../shared/types'
+import type { PetDescriptor, UpdateCheckResult } from '../../../shared/types'
 import type { ChatMessage, PendingTurn, ProviderDescriptor } from '../App'
 import { Icon } from './Icon'
 import { toFileUrl } from '../fileUrl'
@@ -1103,7 +1103,44 @@ export const HoverMenu: React.FC<HoverMenuProps> = ({
   }
 
   const [showAbout, setShowAbout] = useState(false)
+  const [updatePhase, setUpdatePhase] = useState<'idle' | 'checking' | 'downloading' | 'done'>(
+    'idle'
+  )
+  const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null)
+  const [updateProgress, setUpdateProgress] = useState(0)
   const renderSettings = (): React.ReactElement => {
+    const u = updateResult
+    const handleCheck = async (): Promise<void> => {
+      if (updatePhase === 'checking' || updatePhase === 'downloading') return
+      setUpdatePhase('checking')
+      try {
+        const res = await window.petAPI.checkUpdate()
+        setUpdateResult(res)
+        setUpdatePhase('done')
+      } catch {
+        setUpdateResult({ ok: false, currentVersion: '', releasesPage: '', error: '检查失败' })
+        setUpdatePhase('done')
+      }
+    }
+    const handleInstall = async (): Promise<void> => {
+      if (!u?.asset) return
+      setUpdatePhase('downloading')
+      setUpdateProgress(0)
+      const off = window.petAPI.onUpdateProgress((p) => setUpdateProgress(p.percent))
+      try {
+        const res = await window.petAPI.downloadAndInstallUpdate(u.asset)
+        // On success the app quits and relaunches — we only get here on failure.
+        if (!res.ok) {
+          setUpdateResult({ ...u, error: res.error })
+          setUpdatePhase('done')
+        }
+      } catch {
+        setUpdateResult({ ...u, error: '安装失败' })
+        setUpdatePhase('done')
+      } finally {
+        off()
+      }
+    }
     return (
       <>
         {backHeader('设置')}
@@ -1114,6 +1151,58 @@ export const HoverMenu: React.FC<HoverMenuProps> = ({
           onSettings()
         }, false, <span className="font-mono text-[10px] text-slate-400">:7779</span>)}
         <div className="my-1.5 border-t border-slate-200/60" />
+        {menuItem(
+          <Icon name="refresh" />,
+          updatePhase === 'checking' ? '检查中…' : '检查更新',
+          () => void handleCheck(),
+          false,
+          updatePhase === 'downloading' ? (
+            <span className="font-mono text-[10px] text-slate-400">{updateProgress}%</span>
+          ) : undefined
+        )}
+        {updatePhase === 'done' && u && (
+          <div className="mx-2 mt-1 mb-1 px-3 py-2.5 rounded-lg bg-slate-900/[.04] text-[11px] text-slate-600 leading-relaxed space-y-1.5">
+            {u.error ? (
+              <div className="text-rose-600">更新出错：{u.error}</div>
+            ) : u.hasUpdate ? (
+              <>
+                <div className="text-slate-800">
+                  发现新版本 <span className="font-medium">v{u.latestVersion}</span>
+                  <span className="text-slate-400">（当前 v{u.currentVersion}）</span>
+                </div>
+                {u.noAsset ? (
+                  <button
+                    className="w-full px-2 py-1.5 rounded-md bg-slate-900/[.06] hover:bg-slate-900/[.1] text-slate-700 transition-colors"
+                    onClick={() => void window.petAPI.openExternal(u.releasesPage)}
+                  >
+                    无当前平台安装包，前往下载页
+                  </button>
+                ) : (
+                  <button
+                    className="w-full px-2 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-60"
+                    disabled={updatePhase !== 'done'}
+                    onClick={() => void handleInstall()}
+                  >
+                    下载并安装（重启生效）
+                  </button>
+                )}
+              </>
+            ) : (
+              <div>已是最新版本 v{u.currentVersion}</div>
+            )}
+          </div>
+        )}
+        {updatePhase === 'downloading' && (
+          <div className="mx-2 mt-1 mb-1 px-3 py-2.5 rounded-lg bg-slate-900/[.04] text-[11px] text-slate-600">
+            <div className="mb-1.5">正在下载并安装… {updateProgress}%</div>
+            <div className="h-1.5 rounded-full bg-slate-200/80 overflow-hidden">
+              <div
+                className="h-full bg-blue-600 transition-[width] duration-200"
+                style={{ width: `${updateProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
         {menuItem(<Icon name="info" />, '关于 claude-pets', () => setShowAbout((v) => !v))}
         {showAbout && (
           <div className="mx-2 mt-1 mb-1 px-3 py-2.5 rounded-lg bg-slate-900/[.04] text-[11px] text-slate-600 leading-relaxed space-y-1">

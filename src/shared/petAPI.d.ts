@@ -4,7 +4,15 @@
 // `src/preload/index.ts` — adding a method there but not here will
 // cause TS errors at the renderer's call site.
 
-import type { PetDescriptor, PetConfig, DisplayState, ScreenBounds } from './types'
+import type {
+  PetDescriptor,
+  PetConfig,
+  DisplayState,
+  ScreenBounds,
+  UpdateAsset,
+  UpdateCheckResult,
+  UpdateProgress
+} from './types'
 
 export interface PetAPI {
   setIgnoreMouseEvents(ignore: boolean): void
@@ -21,6 +29,9 @@ export interface PetAPI {
   }>
   getScreenBounds(): Promise<ScreenBounds>
   openExternal(url: string): Promise<{ ok: boolean }>
+  checkUpdate(): Promise<UpdateCheckResult>
+  downloadAndInstallUpdate(asset: UpdateAsset): Promise<{ ok: boolean; error?: string }>
+  onUpdateProgress(callback: (p: UpdateProgress) => void): () => void
   getPets(): Promise<PetDescriptor[]>
   setActivePet(petId: string): Promise<PetConfig>
   getConfig(): Promise<PetConfig>
