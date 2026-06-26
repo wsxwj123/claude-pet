@@ -157,10 +157,21 @@ export const PetWidget: React.FC<PetWidgetProps> = ({
     [screenBounds.width, screenBounds.height, petWidth, petHeight]
   )
 
-  // Re-clamp when window/screen size or pet scale changes
+  // On mount + whenever the screen size or pet scale changes, pull the
+  // WHOLE pet back on-screen. A position saved on a larger display (or a
+  // different monitor) would otherwise leave the pet clamped to a ~24px
+  // sliver in a corner — effectively invisible. Edge-tucking during a drag
+  // still uses the lenient MIN_VISIBLE_PX clamp in handleMove.
   useEffect(() => {
-    setPos((p) => clampPos(p.x, p.y))
-  }, [clampPos])
+    setPos((p) => {
+      const maxX = Math.max(0, screenBounds.width - petWidth)
+      const maxY = Math.max(0, screenBounds.height - petHeight)
+      return {
+        x: Math.min(Math.max(0, p.x), maxX),
+        y: Math.min(Math.max(0, p.y), maxY)
+      }
+    })
+  }, [screenBounds.width, screenBounds.height, petWidth, petHeight])
 
   const handleMove = useCallback(
     (dx: number, dy: number) => {
